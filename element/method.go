@@ -5,6 +5,7 @@ import (
 	"syscall/js"
 
 	"github.com/realPy/hogosuru/array"
+	"github.com/realPy/hogosuru/attr"
 	"github.com/realPy/hogosuru/baseobject"
 	"github.com/realPy/hogosuru/domrect"
 	"github.com/realPy/hogosuru/domrectlist"
@@ -16,6 +17,26 @@ import (
 
 func (e Element) attachShadow() {
 	//TODO IMPLEMENT
+}
+
+func (e Element) After(params ...interface{}) error {
+	var err error
+	var arrayJS []interface{}
+
+	for _, param := range params {
+		switch p := param.(type) {
+		case node.Node:
+			arrayJS = append(arrayJS, p.JSObject())
+		case string:
+			arrayJS = append(arrayJS, js.ValueOf(p))
+		default:
+			return ErrSendUnknownType
+		}
+	}
+
+	_, err = e.Call("after", arrayJS...)
+
+	return err
 }
 
 func (e Element) Animate(keyframes, options interface{}) error {
@@ -40,25 +61,19 @@ func (e Element) Animate(keyframes, options interface{}) error {
 	return err
 }
 
-func (e Element) After(elements ...Element) error {
+func (e Element) Append(params ...interface{}) error {
 	var err error
 	var arrayJS []interface{}
 
-	for _, elem := range elements {
-		arrayJS = append(arrayJS, elem.JSObject())
-	}
-
-	_, err = e.Call("after", arrayJS...)
-
-	return err
-}
-
-func (e Element) Append(elements ...Element) error {
-	var err error
-	var arrayJS []interface{}
-
-	for _, elem := range elements {
-		arrayJS = append(arrayJS, elem.JSObject())
+	for _, param := range params {
+		switch p := param.(type) {
+		case node.Node:
+			arrayJS = append(arrayJS, p.JSObject())
+		case string:
+			arrayJS = append(arrayJS, js.ValueOf(p))
+		default:
+			return ErrSendUnknownType
+		}
 	}
 
 	_, err = e.Call("append", arrayJS...)
@@ -66,12 +81,19 @@ func (e Element) Append(elements ...Element) error {
 	return err
 }
 
-func (e Element) Before(elements ...Element) error {
+func (e Element) Before(params ...interface{}) error {
 	var err error
 	var arrayJS []interface{}
 
-	for _, elem := range elements {
-		arrayJS = append(arrayJS, elem.JSObject())
+	for _, param := range params {
+		switch p := param.(type) {
+		case node.Node:
+			arrayJS = append(arrayJS, p.JSObject())
+		case string:
+			arrayJS = append(arrayJS, js.ValueOf(p))
+		default:
+			return ErrSendUnknownType
+		}
 	}
 
 	_, err = e.Call("before", arrayJS...)
@@ -79,14 +101,13 @@ func (e Element) Before(elements ...Element) error {
 	return err
 }
 
-func (e Element) Closest(query string) (Element, error) {
+func (e Element) Closest(selectors string) (Element, error) {
 	var err error
 	var obj js.Value
 	var elem Element
 
-	if obj, err = e.Call("closest", js.ValueOf(query)); err == nil {
-
-		elem, err = NewFromJSObject(obj)
+	if obj, err = e.Call("closest", js.ValueOf(selectors)); err == nil {
+		return NewFromJSObject(obj)
 	}
 
 	return elem, err
@@ -100,51 +121,72 @@ func (e Element) getAnimations() {
 	//TODO IMPLEMENT
 }
 
-func (e Element) GetAttribute(attributename string) (string, error) {
-
+func (e Element) GetAttribute(attributeName string) (string, error) {
 	var err error
 	var obj js.Value
 	var newstr string
 
-	if obj, err = e.Call("getAttribute", js.ValueOf(attributename)); err == nil {
+	if obj, err = e.Call("getAttribute", js.ValueOf(attributeName)); err == nil {
 		if obj.IsNull() {
-			err = ErrAttributeEmpty
-		} else {
-			newstr = obj.String()
+			return newstr, ErrAttributeEmpty
 		}
-
+		return obj.String(), err
 	}
 	return newstr, err
 }
 
 func (e Element) GetAttributeNames() (array.Array, error) {
-
 	var err error
 	var obj js.Value
 	var arr array.Array
 
 	if obj, err = e.Call("getAttributeNames"); err == nil {
 		if obj.IsNull() {
-			err = ErrAttributeEmpty
-		} else {
-			arr, err = array.NewFromJSObject(obj)
+			return arr, ErrAttributeEmpty
 		}
-
+		return array.NewFromJSObject(obj)
 	}
 	return arr, err
 }
-func (e Element) GetAttributeNS(namespace, name string) (object.Object, error) {
+
+func (e Element) GetAttributeNode(attrName string) (attr.Attr, error) {
 	var err error
 	var obj js.Value
-	var newobj object.Object
+	var newobj attr.Attr
+
+	if obj, err = e.Call("getAttributeNode", js.ValueOf(attrName)); err == nil {
+		if obj.IsNull() {
+			return newobj, ErrAttributeEmpty
+		}
+		return attr.NewFromJSObject(obj)
+	}
+	return newobj, err
+}
+
+func (e Element) GetAttributeNodeNS(namespace, nodeName string) (attr.Attr, error) {
+	var err error
+	var obj js.Value
+	var newobj attr.Attr
+
+	if obj, err = e.Call("getAttributeNodeNS", js.ValueOf(namespace), js.ValueOf(nodeName)); err == nil {
+		if obj.IsNull() {
+			return newobj, ErrAttributeEmpty
+		}
+		return attr.NewFromJSObject(obj)
+	}
+	return newobj, err
+}
+
+func (e Element) GetAttributeNS(namespace, name string) (string, error) {
+	var err error
+	var obj js.Value
+	var newobj string
 
 	if obj, err = e.Call("getAttributeNS", js.ValueOf(namespace), js.ValueOf(name)); err == nil {
 		if obj.IsNull() {
-			err = ErrAttributeEmpty
-		} else {
-			newobj, err = object.NewFromJSObject(obj)
+			return newobj, ErrAttributeEmpty
 		}
-
+		return obj.String(), err
 	}
 	return newobj, err
 }
@@ -155,213 +197,219 @@ func (e Element) GetBoundingClientRect() (domrect.DOMRect, error) {
 	var newdomrect domrect.DOMRect
 
 	if obj, err = e.Call("getBoundingClientRect"); err == nil {
-
-		newdomrect, err = domrect.NewFromJSObject(obj)
-
+		return domrect.NewFromJSObject(obj)
 	}
 	return newdomrect, err
 }
 
-//retourne un DOMRectList
+// retourne un DOMRectList
 func (e Element) GetClientRects() (domrectlist.DOMRectList, error) {
 	var err error
 	var obj js.Value
 	var arr domrectlist.DOMRectList
 
 	if obj, err = e.Call("getClientRects"); err == nil {
-
-		arr, err = domrectlist.NewFromJSObject(obj)
-
+		return domrectlist.NewFromJSObject(obj)
 	}
 	return arr, err
 }
 
-func (e Element) GetElementsByClassName(classname string) (htmlcollection.HtmlCollection, error) {
-
+func (e Element) GetElementsByClassName(names string) (htmlcollection.HtmlCollection, error) {
 	var err error
 	var obj js.Value
 	var collection htmlcollection.HtmlCollection
 
-	if obj, err = e.Call("getElementsByClassName", js.ValueOf(classname)); err == nil {
-
+	if obj, err = e.Call("getElementsByClassName", js.ValueOf(names)); err == nil {
 		if !obj.IsNull() {
-			collection, err = htmlcollection.NewFromJSObject(obj)
-		} else {
-			err = ErrElementsNotFound
+			return htmlcollection.NewFromJSObject(obj)
 		}
-
+		return collection, ErrElementsNotFound
 	}
 
 	return collection, err
 }
 
-func (e Element) GetElementsByTagName(tagname string) (htmlcollection.HtmlCollection, error) {
-
+func (e Element) GetElementsByTagName(tagName string) (htmlcollection.HtmlCollection, error) {
 	var err error
 	var obj js.Value
 	var collection htmlcollection.HtmlCollection
 
-	if obj, err = e.Call("getElementsByTagName", js.ValueOf(tagname)); err == nil {
+	if obj, err = e.Call("getElementsByTagName", js.ValueOf(tagName)); err == nil {
 		if obj.IsNull() || obj.IsUndefined() {
-			err = ErrElementsNotFound
-
-		} else {
-			collection, err = htmlcollection.NewFromJSObject(obj)
+			return collection, ErrElementsNotFound
 		}
+		return htmlcollection.NewFromJSObject(obj)
 	}
 
 	return collection, err
 }
 
-func (e Element) GetElementsByTagNameNS(namespace, tagname string) (htmlcollection.HtmlCollection, error) {
+func (e Element) GetElementsByTagNameNS(namespaceURI, localName string) (htmlcollection.HtmlCollection, error) {
 	var err error
 	var obj js.Value
 	var collection htmlcollection.HtmlCollection
 
-	if obj, err = e.Call("getElementsByTagNameNS", js.ValueOf(namespace), js.ValueOf(tagname)); err == nil {
+	if obj, err = e.Call("getElementsByTagNameNS", js.ValueOf(namespaceURI), js.ValueOf(localName)); err == nil {
 		if obj.IsNull() || obj.IsUndefined() {
-			err = ErrElementsNotFound
-		} else {
-			collection, err = htmlcollection.NewFromJSObject(obj)
-
+			return collection, ErrElementsNotFound
 		}
+		return htmlcollection.NewFromJSObject(obj)
 	}
 
 	return collection, err
 }
 
-func (e Element) HasAttribute(attributename string) (bool, error) {
+func (e Element) HasAttribute(name string) (bool, error) {
 	var err error
 	var obj js.Value
 	var result bool
 
-	if obj, err = e.Call("hasChildNodes", js.ValueOf(attributename)); err == nil {
+	if obj, err = e.Call("hasChildNodes", js.ValueOf(name)); err == nil {
 		if obj.Type() == js.TypeBoolean {
-			result = obj.Bool()
-		} else {
-			err = baseobject.ErrObjectNotBool
+			return obj.Bool(), err
 		}
+		return result, baseobject.ErrObjectNotBool
 	}
 
 	return result, err
 
 }
 
-func (e Element) HasPointerCapture(pointerid int) (bool, error) {
+func (e Element) HasAttributeNS(namespace, localName string) (bool, error) {
 	var err error
 	var obj js.Value
 	var result bool
 
-	if obj, err = e.Call("hasPointerCapture", js.ValueOf(pointerid)); err == nil {
+	if obj, err = e.Call("hasAttributesNS", js.ValueOf(namespace), js.ValueOf(localName)); err == nil {
 		if obj.Type() == js.TypeBoolean {
-			result = obj.Bool()
-		} else {
-			err = baseobject.ErrObjectNotBool
+			return obj.Bool(), err
 		}
+		return result, baseobject.ErrObjectNotBool
 	}
 	return result, err
 }
 
-func (e Element) InsertAdjacentElement(position string, elem Element) (Element, error) {
+func (e Element) HasAttributes() (bool, error) {
+	var err error
+	var obj js.Value
+	var result bool
+
+	if obj, err = e.Call("hasAttributes"); err == nil {
+		if obj.Type() == js.TypeBoolean {
+			return obj.Bool(), err
+		}
+		return result, baseobject.ErrObjectNotBool
+	}
+	return result, err
+}
+
+func (e Element) HasPointerCapture(pointerId int) (bool, error) {
+	var err error
+	var obj js.Value
+	var result bool
+
+	if obj, err = e.Call("hasPointerCapture", js.ValueOf(pointerId)); err == nil {
+		if obj.Type() == js.TypeBoolean {
+			return obj.Bool(), err
+		}
+		return result, baseobject.ErrObjectNotBool
+	}
+	return result, err
+}
+
+func (e Element) InsertAdjacentElement(position string, element Element) (Element, error) {
 	var elemObject js.Value
 	var newelem Element
 	var err error
 
-	if elemObject, err = e.Call("insertAdjacentElement", js.ValueOf(position), elem.JSObject()); err == nil {
-
+	if elemObject, err = e.Call("insertAdjacentElement", js.ValueOf(position), element.JSObject()); err == nil {
 		if elemObject.IsNull() {
-			err = ErrInsertAdjacent
-
-		} else {
-			newelem = elem
+			return newelem, ErrInsertAdjacent
 		}
-
+		return element, err
 	}
 	return newelem, err
 }
 
-func (e Element) InsertAdjacentHTML(position string, textHTML string) error {
-
+func (e Element) InsertAdjacentHTML(position string, text string) error {
 	var err error
 
-	_, err = e.Call("insertAdjacentHTML", js.ValueOf(position), js.ValueOf(textHTML))
+	_, err = e.Call("insertAdjacentHTML", js.ValueOf(position), js.ValueOf(text))
 	return err
 }
 
-func (e Element) InsertAdjacentText(position string, text string) error {
-
+func (e Element) InsertAdjacentText(where string, data string) error {
 	var err error
 
-	_, err = e.Call("insertAdjacentText", js.ValueOf(position), js.ValueOf(text))
+	_, err = e.Call("insertAdjacentText", js.ValueOf(where), js.ValueOf(data))
 	return err
 }
 
-func (e Element) Matches(selector string) (bool, error) {
+func (e Element) Matches(selectors string) (bool, error) {
 	var err error
 	var obj js.Value
 	var result bool
 
-	if obj, err = e.Call("matches", js.ValueOf(selector)); err == nil {
+	if obj, err = e.Call("matches", js.ValueOf(selectors)); err == nil {
 		if obj.Type() == js.TypeBoolean {
-			result = obj.Bool()
-		} else {
-			err = baseobject.ErrObjectNotBool
+			return obj.Bool(), err
 		}
+		return result, baseobject.ErrObjectNotBool
 	}
 	return result, err
 }
-func (e Element) pseudo() {
-	//TODO IMPLEMENT
-}
 
-func (e Element) Prepend(elements ...Element) error {
+func (e Element) Prepend(params ...interface{}) error {
 	var err error
 	var arrayJS []interface{}
 
-	for _, elem := range elements {
-		arrayJS = append(arrayJS, elem.JSObject())
+	for _, param := range params {
+		switch p := param.(type) {
+		case node.Node:
+			arrayJS = append(arrayJS, p.JSObject())
+		case string:
+			arrayJS = append(arrayJS, js.ValueOf(p))
+		default:
+			return ErrSendUnknownType
+		}
 	}
 
-	_, err = e.Call("prepend", arrayJS...)
+	_, err = e.Call("preprend", arrayJS...)
 
 	return err
 }
 
-func (e Element) QuerySelector(selector string) (node.Node, error) {
-
+func (e Element) QuerySelector(selectors string) (node.Node, error) {
 	var err error
 	var obj js.Value
 	var nod node.Node
 
-	if obj, err = e.Call("querySelector", js.ValueOf(selector)); err == nil {
+	if obj, err = e.Call("querySelector", js.ValueOf(selectors)); err == nil {
 		if !obj.IsNull() {
-			nod, err = node.NewFromJSObject(obj)
-		} else {
-			err = errors.New(ErrElementNotFound.Error() + "" + selector)
+			return node.NewFromJSObject(obj)
 		}
+		return nod, errors.New(ErrElementNotFound.Error() + "" + selectors)
 	}
 	return nod, err
 }
 
-func (e Element) QuerySelectorAll(selector string) (nodelist.NodeList, error) {
-
+func (e Element) QuerySelectorAll(selectors string) (nodelist.NodeList, error) {
 	var err error
 	var obj js.Value
 	var nlist nodelist.NodeList
 
-	if obj, err = e.Call("querySelectorAll", js.ValueOf(selector)); err == nil {
+	if obj, err = e.Call("querySelectorAll", js.ValueOf(selectors)); err == nil {
 		if !obj.IsNull() {
-			nlist, err = nodelist.NewFromJSObject(obj)
-		} else {
-			err = errors.New(ErrElementsNotFound.Error() + "" + selector)
+			return nodelist.NewFromJSObject(obj)
 		}
+		return nlist, errors.New(ErrElementsNotFound.Error() + "" + selectors)
 	}
 	return nlist, err
 }
 
-func (e Element) ReleasePointerCapture(pointerid int) error {
+func (e Element) ReleasePointerCapture(pointerId int) error {
 	var err error
-	_, err = e.Call("releasePointerCapture", js.ValueOf(pointerid))
+	_, err = e.Call("releasePointerCapture", js.ValueOf(pointerId))
 	return err
 }
 func (e Element) Remove() error {
@@ -370,15 +418,38 @@ func (e Element) Remove() error {
 	return err
 }
 
-func (e Element) RemoveAttribute(attrname string) error {
+func (e Element) RemoveAttribute(attrName string) error {
 	var err error
-	_, err = e.Call("removeAttribute", js.ValueOf(attrname))
+	_, err = e.Call("removeAttribute", js.ValueOf(attrName))
 	return err
 }
 
-func (e Element) RemoveAttributeNS(namespace, attrname string) error {
+func (e Element) removeAttributeNode() {
+	//TODO IMPLEMENT
+}
+
+func (e Element) RemoveAttributeNS(namespace, attrName string) error {
 	var err error
-	_, err = e.Call("removeAttributeNS", js.ValueOf(namespace), js.ValueOf(attrname))
+	_, err = e.Call("removeAttributeNS", js.ValueOf(namespace), js.ValueOf(attrName))
+	return err
+}
+
+func (e Element) ReplaceChildren(params ...interface{}) error {
+	var err error
+	var arrayJS []interface{}
+	for _, param := range params {
+		switch p := param.(type) {
+		case node.Node:
+			arrayJS = append(arrayJS, p.JSObject())
+		case string:
+			arrayJS = append(arrayJS, js.ValueOf(p))
+		default:
+			return ErrSendUnknownType
+		}
+	}
+
+	_, err = e.Call("replaceChildren", arrayJS...)
+
 	return err
 }
 
@@ -394,29 +465,91 @@ func (e Element) RequestPointerLock() error {
 	return err
 }
 
-func (e Element) Scroll(x, y int, opts ...map[string]interface{}) error {
+func (e Element) Scroll(params ...interface{}) error {
 	var err error
 	var optJSValue []interface{}
 
-	optJSValue = append(optJSValue, js.ValueOf(x))
-	optJSValue = append(optJSValue, js.ValueOf(y))
-	if opts != nil && len(opts) == 1 {
-		optJSValue = append(optJSValue, js.ValueOf(opts[0]))
+	if len(params) == 1 {
+		if options, ok := params[0].(map[string]interface{}); ok {
+			optJSValue = append(optJSValue, js.ValueOf(options))
+			_, err = e.Call("scroll", optJSValue)
+			return err
+		}
+		return ErrAttributeEmpty
 	}
-	_, err = e.Call("scroll", optJSValue...)
+	if len(params) == 2 {
+		if _, ok := params[0].(int); !ok {
+			return ErrSendUnknownType
+		}
+		if _, ok := params[1].(int); !ok {
+			return ErrSendUnknownType
+		}
+		optJSValue = append(optJSValue, js.ValueOf(params[0]))
+		optJSValue = append(optJSValue, js.ValueOf(params[1]))
+		_, err = e.Call("scroll", optJSValue...)
+		return err
+	}
+	return ErrAttributeEmpty
+}
+
+func (e Element) ScrollBy(params ...interface{}) error {
+	var err error
+	var optJSValue []interface{}
+
+	if len(params) == 1 {
+		if options, ok := params[0].(map[string]interface{}); ok {
+			optJSValue = append(optJSValue, js.ValueOf(options))
+			_, err = e.Call("scrollBy", optJSValue)
+			return err
+		}
+		return ErrAttributeEmpty
+	}
+	if len(params) == 2 {
+		if _, ok := params[0].(int); !ok {
+			return ErrSendUnknownType
+		}
+		if _, ok := params[1].(int); !ok {
+			return ErrSendUnknownType
+		}
+		optJSValue = append(optJSValue, js.ValueOf(params[0]))
+		optJSValue = append(optJSValue, js.ValueOf(params[1]))
+		_, err = e.Call("scrollBy", optJSValue...)
+		return err
+	}
+	return ErrAttributeEmpty
+}
+
+func (e Element) ScrollIntoView() error {
+	var err error
+	_, err = e.Call("scrollBy")
 	return err
 }
-func (e Element) ScrollTo(x, y int, opts ...map[string]interface{}) error {
+
+func (e Element) ScrollTo(params ...interface{}) error {
 	var err error
 	var optJSValue []interface{}
 
-	optJSValue = append(optJSValue, js.ValueOf(x))
-	optJSValue = append(optJSValue, js.ValueOf(y))
-	if opts != nil && len(opts) == 1 {
-		optJSValue = append(optJSValue, js.ValueOf(opts[0]))
+	if len(params) == 1 {
+		if options, ok := params[0].(map[string]interface{}); ok {
+			optJSValue = append(optJSValue, js.ValueOf(options))
+			_, err = e.Call("scrollTo", optJSValue)
+			return err
+		}
+		return ErrAttributeEmpty
 	}
-	_, err = e.Call("scrollTo", optJSValue...)
-	return err
+	if len(params) == 2 {
+		if _, ok := params[0].(int); !ok {
+			return ErrSendUnknownType
+		}
+		if _, ok := params[1].(int); !ok {
+			return ErrSendUnknownType
+		}
+		optJSValue = append(optJSValue, js.ValueOf(params[0]))
+		optJSValue = append(optJSValue, js.ValueOf(params[1]))
+		_, err = e.Call("scrollTo", optJSValue...)
+		return err
+	}
+	return ErrAttributeEmpty
 }
 
 func (e Element) SetAttribute(name, value string) error {
@@ -424,35 +557,43 @@ func (e Element) SetAttribute(name, value string) error {
 	_, err = e.Call("setAttribute", js.ValueOf(name), js.ValueOf(value))
 	return err
 }
+
+func (e Element) setAttributeNode() {
+	//TODO IMPLEMENT
+}
+
+func (e Element) setAttributeNodeNS() {
+	//TODO IMPLEMENT
+}
+
 func (e Element) SetAttributeNS(namespace, name, value string) error {
 	var err error
 	_, err = e.Call("setAttributeNS", js.ValueOf(namespace), js.ValueOf(name), js.ValueOf(value))
 	return err
 }
 
-func (e Element) SetPointerCapture(pointerid int) error {
+func (e Element) SetPointerCapture(pointerId int) error {
 	var err error
-	_, err = e.Call("setPointerCapture", js.ValueOf(pointerid))
+	_, err = e.Call("setPointerCapture", js.ValueOf(pointerId))
 	return err
 }
 
-func (e Element) ToggleAttribute(name string, opts ...interface{}) (bool, error) {
+func (e Element) ToggleAttribute(name string, force ...interface{}) (bool, error) {
 	var err error
 	var optJSValue []interface{}
 	var obj js.Value
 	var result bool
 
 	optJSValue = append(optJSValue, js.ValueOf(name))
-	if opts != nil && len(opts) == 1 {
-		optJSValue = append(optJSValue, js.ValueOf(opts[0]))
+	if force != nil && len(force) == 1 {
+		optJSValue = append(optJSValue, js.ValueOf(force[0]))
 	}
 
 	if obj, err = e.Call("toggleAttribute", optJSValue...); err == nil {
 		if obj.Type() == js.TypeBoolean {
-			result = obj.Bool()
-		} else {
-			err = baseobject.ErrObjectNotBool
+			return obj.Bool(), err
 		}
+		return result, baseobject.ErrObjectNotBool
 	}
 	return result, err
 }
