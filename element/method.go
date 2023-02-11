@@ -5,6 +5,7 @@ import (
 	"syscall/js"
 
 	"github.com/realPy/hogosuru/array"
+	"github.com/realPy/hogosuru/attr"
 	"github.com/realPy/hogosuru/baseobject"
 	"github.com/realPy/hogosuru/domrect"
 	"github.com/realPy/hogosuru/domrectlist"
@@ -162,7 +163,7 @@ func (e Element) GetBoundingClientRect() (domrect.DOMRect, error) {
 	return newdomrect, err
 }
 
-//retourne un DOMRectList
+// retourne un DOMRectList
 func (e Element) GetClientRects() (domrectlist.DOMRectList, error) {
 	var err error
 	var obj js.Value
@@ -424,6 +425,17 @@ func (e Element) SetAttribute(name, value string) error {
 	_, err = e.Call("setAttribute", js.ValueOf(name), js.ValueOf(value))
 	return err
 }
+
+func (e Element) SetAttributeNode(attribute attr.Attr) (attr.Attr, error) {
+	var err error
+	var obj js.Value
+
+	if obj, err = e.Call("setAttributeNode", attribute.JSObject()); err == nil {
+		return attr.NewFromJSObject(obj)
+	}
+	return attr.Attr{}, err
+}
+
 func (e Element) SetAttributeNS(namespace, name, value string) error {
 	var err error
 	_, err = e.Call("setAttributeNS", js.ValueOf(namespace), js.ValueOf(name), js.ValueOf(value))

@@ -464,6 +464,27 @@ func TestSetAttribute(t *testing.T) {
 
 }
 
+func TestSetAttributeNode(t *testing.T) {
+	baseobject.Eval(`
+	div = document.createElement("div")
+	div.setAttribute("id", "hello")
+	p = document.createElement("p")
+	attribute = div.getAttributeNode("id").cloneNode(true)
+	`)
+
+	if objdiv, err := baseobject.Get(js.Global(), "div"); testingutils.AssertErr(t, err) {
+		if div, err := NewFromJSObject(objdiv); testingutils.AssertErr(t, err) {
+			if objattr, err := baseobject.Get(js.Global(), "attribute"); testingutils.AssertErr(t, err) {
+				if attr, err := attr.NewFromJSObject(objattr); testingutils.AssertErr(t, err) {
+					if b, err := div.SetAttributeNode(attr); testingutils.AssertErr(t, err) {
+						testingutils.AssertExpect(t, attr, b)
+					}
+				}
+			}
+		}
+	}
+}
+
 func TestSetAttributeNS(t *testing.T) {
 
 	baseobject.Eval(`
